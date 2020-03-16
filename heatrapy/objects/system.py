@@ -154,8 +154,8 @@ class system_objects:
                 td2 = self.objects[contact[0][0]].temperature[ind2][0]
                 heat_contact_1 = contact[2] * (td1 - td2)
                 heat_contact_2 = contact[2] * (td2 - td1)
-                self.objects[contact[0][0]].Q0[ind2] = heat_contact_1
-                self.objects[contact[1][0]].Q0[ind1] = heat_contact_2
+                self.objects[contact[0][0]].Q0[ind2] = heat_contact_1/self.dx
+                self.objects[contact[1][0]].Q0[ind1] = heat_contact_2/self.dx
 
             object_number = -1
             for obj in self.objects:
@@ -323,6 +323,7 @@ class single_object(object):
         self.amb_temperature = amb_temperature
         self.h_left = h_left
         self.h_right = h_right
+        self.input_heat_transfer = False
 
         # loads the data for each material
         if materials_path == False:
@@ -442,6 +443,12 @@ class single_object(object):
         f.write(line)
         f.close()
 
+    def set_input_heat_transfer(self,input_heat_transfer_point,Heat_transfer_coefficient,Heat_transfer_temparature):
+        self.input_heat_transfer=True
+        self.input_heat_transfer_point = input_heat_transfer_point
+        self.Heat_transfer_coefficient = Heat_transfer_coefficient
+        self.Heat_transfer_temparature = Heat_transfer_temparature
+
     def changeHeatPower(self, Q=[], Q0=[]):
         """Heat power source change
 
@@ -501,6 +508,12 @@ class single_object(object):
                         self.temperature[i][0])
                     self.k[i] = self.materials[self.materials_index[i]].k0(
                         self.temperature[i][0])
+
+            #熱伝達率と温度でインプットする場合
+            if self.input_heat_transfer:
+                td = self.temperature[self.input_heat_transfer_point][0]
+                self.Q0[self.input_heat_transfer_point] = self.Heat_transfer_coefficient * (self.Heat_transfer_temparature - td)/self.dx
+                print(td,self.Q0)
 
             # SOLVERS
 

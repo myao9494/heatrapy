@@ -35,7 +35,7 @@ class system_objects:
         dt: the times step
         file_name: file name where the temperature and heat flux are saved
         boundaries: tuple of two entries that define the boundary condition
-            for tempreture. The first corresponds to the thermal obect while
+            for tempreture. The first corresponds to the thermal object while
             the second defines the temperature. If 0 the boundary condition is
             insulation
         initial_state: initial state of the materials. True if applied field
@@ -81,8 +81,10 @@ class system_objects:
         self.contacts = set()
         self.boundaries = boundaries
         self.dt = dt
+        self.dx = dx
         self.q1 = 0.
         self.q2 = 0.
+        self.input_heat_transfer = False
 
         for i in boundaries:
             if i[1] != 0:
@@ -105,7 +107,7 @@ class system_objects:
     def contactAdd(self, contact):
         """Add contact to self.contacts
 
-        contact: thermal contact
+        contact: thermal contact ((オブジェクト番号1,接触節点番号),(オブジェクト番号2,接触節点番号),接触熱伝達係数)
 
         """
 
@@ -125,6 +127,19 @@ class system_objects:
                 removing_contact = self.contacts[i]
 
         self.contacts.remove(removing_contact)
+
+    def set_input_heat_transfer(self,input_heat_transfer_point,Heat_transfer_coefficient,Heat_transfer_temparature):
+        """熱伝達率と温度でを任意の位置へ追加します。現状、一点のみへの入熱です
+
+        Arguments:
+            input_heat_transfer_point {tuple} -- (オブジェクト番号,番号)　入熱するポイントです。一番上の場合は、1です
+            Heat_transfer_coefficient {float} -- 熱伝達率[W/(m2K)]
+            Heat_transfer_temparature {float} -- 熱伝達に使用される温度です[K]
+        """
+        self.input_heat_transfer=True
+        self.input_heat_transfer_point = input_heat_transfer_point
+        self.Heat_transfer_coefficient = Heat_transfer_coefficient
+        self.Heat_transfer_temparature = Heat_transfer_temparature
 
     def compute(self, timeInterval, write_interval, solver='implicit_k(x)'):
         """Computes the thermal process
@@ -161,6 +176,12 @@ class system_objects:
             for obj in self.objects:
                 object_number = object_number + 1
                 obj.time_passed = obj.time_passed + obj.dt
+
+                #熱伝達率と温度でインプットする場合
+                if self.input_heat_transfer and self.input_heat_transfer_point[0]==object_number :
+                    td = self.objects[object_number].temperature[self.input_heat_transfer_point[1]][0]
+                    self.objects[object_number].Q0[self.input_heat_transfer_point[1]] = self.Heat_transfer_coefficient * (self.Heat_transfer_temparature - td)/self.dx
+                    print(object_number,td,self.objects[object_number].Q0)
 
                 cond1 = object_number not in [l[0] for l in self.boundaries]
                 if cond1 or (object_number, 0) in self.boundaries:
@@ -260,7 +281,7 @@ class single_object(object):
     """
 
     def __init__(self, amb_temperature, materials=('Cu',), borders=(1, 11),
-                 materials_order=(0,), dx=0.01, dt=0.1, file_name='data.txt',
+                 materials_order=(0,), dx=0.001, dt=0.1, file_name='data.txt',
                  boundaries=(0, 0), Q=[], Q0=[], heat_points=(1, -2),
                  initial_state=False, h_left=50000., h_right=50000.,
                  materials_path=False):
@@ -323,7 +344,7 @@ class single_object(object):
         self.amb_temperature = amb_temperature
         self.h_left = h_left
         self.h_right = h_right
-        self.input_heat_transfer = False
+        self.input_heat_transfer = False #これをTrueにすると熱伝達率+温度での入熱を入れる
 
         # loads the data for each material
         if materials_path == False:
@@ -444,6 +465,13 @@ class single_object(object):
         f.close()
 
     def set_input_heat_transfer(self,input_heat_transfer_point,Heat_transfer_coefficient,Heat_transfer_temparature):
+        """熱伝達率と温度でを任意の位置へ追加します。現状、一点のみへの入熱です
+        
+        Arguments:
+            input_heat_transfer_point {int} -- 入熱するポイントです。一番上の場合は、1です
+            Heat_transfer_coefficient {float} -- 熱伝達率[W/(m2K)]
+            Heat_transfer_temparature {float} -- 熱伝達に使用される温度です[K]
+        """
         self.input_heat_transfer=True
         self.input_heat_transfer_point = input_heat_transfer_point
         self.Heat_transfer_coefficient = Heat_transfer_coefficient

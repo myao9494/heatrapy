@@ -181,7 +181,7 @@ class system_objects:
                 if self.input_heat_transfer and self.input_heat_transfer_point[0]==object_number :
                     td = self.objects[object_number].temperature[self.input_heat_transfer_point[1]][0]
                     self.objects[object_number].Q0[self.input_heat_transfer_point[1]] = self.Heat_transfer_coefficient * (self.Heat_transfer_temparature - td)/self.dx
-                    print(object_number,td,self.objects[object_number].Q0)
+                    # print(object_number,td,self.objects[object_number].Q0)
 
                 cond1 = object_number not in [l[0] for l in self.boundaries]
                 if cond1 or (object_number, 0) in self.boundaries:
@@ -541,7 +541,7 @@ class single_object(object):
             if self.input_heat_transfer:
                 td = self.temperature[self.input_heat_transfer_point][0]
                 self.Q0[self.input_heat_transfer_point] = self.Heat_transfer_coefficient * (self.Heat_transfer_temparature - td)/self.dx
-                print(td,self.Q0)
+                # print(td,self.Q0)
 
             # SOLVERS
 

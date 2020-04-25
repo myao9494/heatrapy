@@ -85,6 +85,7 @@ class system_objects:
         self.q1 = 0.
         self.q2 = 0.
         self.input_heat_transfer = False
+        self.input_heat_transfer_function = False #これをTrueにすると熱伝達率+温度での入熱を入れる
 
         for i in boundaries:
             if i[1] != 0:
@@ -141,6 +142,19 @@ class system_objects:
         self.Heat_transfer_coefficient = Heat_transfer_coefficient
         self.Heat_transfer_temparature = Heat_transfer_temparature
 
+    def set_input_heat_transfer_function(self,input_heat_transfer_point,Heat_transfer_coefficient_function,Heat_transfer_temparature_function):
+        """熱伝達率と温度でを任意の位置へ追加します。現状、一点のみへの入熱です
+        
+        Arguments:
+            input_heat_transfer_point {tuple} -- (オブジェクト番号,番号)　入熱するポイントです。一番上の場合は、1です
+            Heat_transfer_coefficient_function {float} -- 熱伝達率[W/(m2K)] 関数（scipyのinterpolate)
+            Heat_transfer_temparature_function {float} -- 熱伝達に使用される温度[K] 関数（scipyのinterpolate)
+        """
+        self.input_heat_transfer_function=True
+        self.input_heat_transfer_point = input_heat_transfer_point
+        self.Heat_transfer_coefficient_function = Heat_transfer_coefficient_function
+        self.Heat_transfer_temparature_function = Heat_transfer_temparature_function
+
     def compute(self, timeInterval, write_interval, solver='implicit_k(x)'):
         """Computes the thermal process
 
@@ -157,6 +171,7 @@ class system_objects:
         # number of time steps counting from the last writing process
         nw = 0
 
+        self.temp_list=[]
         # computes
         for j in range(nt):
             for obj in self.objects:
@@ -177,11 +192,21 @@ class system_objects:
                 object_number = object_number + 1
                 obj.time_passed = obj.time_passed + obj.dt
 
-                #熱伝達率と温度でインプットする場合
+            #熱伝達率と温度でインプットする場合（固定値）
                 if self.input_heat_transfer and self.input_heat_transfer_point[0]==object_number :
                     td = self.objects[object_number].temperature[self.input_heat_transfer_point[1]][0]
                     self.objects[object_number].Q0[self.input_heat_transfer_point[1]] = self.Heat_transfer_coefficient * (self.Heat_transfer_temparature - td)/self.dx
                     # print(object_number,td,self.objects[object_number].Q0)
+
+            #熱伝達率と温度でインプットする場合(関数)
+                if self.input_heat_transfer_function and self.input_heat_transfer_point[0]==object_number :
+                    # print(self.dt*j)
+                    td = self.objects[object_number].temperature[self.input_heat_transfer_point[1]][0]
+                    Heat_transfer_coefficient = self.Heat_transfer_coefficient_function(self.dt*j).tolist()
+                    Heat_transfer_temparature = self.Heat_transfer_temparature_function(self.dt*j).tolist()
+                    self.temp_list.append([self.dt*j,Heat_transfer_coefficient,Heat_transfer_temparature])
+                    self.objects[object_number].Q0[self.input_heat_transfer_point[1]] = Heat_transfer_coefficient * (Heat_transfer_temparature - td)/self.dx
+                    # print(td,self.Q0)
 
                 cond1 = object_number not in [l[0] for l in self.boundaries]
                 if cond1 or (object_number, 0) in self.boundaries:
@@ -345,6 +370,7 @@ class single_object(object):
         self.h_left = h_left
         self.h_right = h_right
         self.input_heat_transfer = False #これをTrueにすると熱伝達率+温度での入熱を入れる
+        self.input_heat_transfer_function = False #これをTrueにすると熱伝達率+温度での入熱を入れる
 
         # loads the data for each material
         if materials_path == False:
@@ -477,6 +503,19 @@ class single_object(object):
         self.Heat_transfer_coefficient = Heat_transfer_coefficient
         self.Heat_transfer_temparature = Heat_transfer_temparature
 
+    def set_input_heat_transfer_function(self,input_heat_transfer_point,Heat_transfer_coefficient_function,Heat_transfer_temparature_function):
+        """熱伝達率と温度でを任意の位置へ追加します。現状、一点のみへの入熱です
+        
+        Arguments:
+            input_heat_transfer_point {int} -- 入熱するポイントです。一番上の場合は、1です
+            Heat_transfer_coefficient_function {float} -- 熱伝達率[W/(m2K)] 関数（scipyのinterpolate)
+            Heat_transfer_temparature_function {float} -- 熱伝達に使用される温度[K] 関数（scipyのinterpolate)
+        """
+        self.input_heat_transfer_function=True
+        self.input_heat_transfer_point = input_heat_transfer_point
+        self.Heat_transfer_coefficient_function = Heat_transfer_coefficient_function
+        self.Heat_transfer_temparature_function = Heat_transfer_temparature_function
+
     def changeHeatPower(self, Q=[], Q0=[]):
         """Heat power source change
 
@@ -514,13 +553,14 @@ class single_object(object):
         # saves the reference temperature for the modeTemp
         initModeTemp = self.temperature[modeTempPoint][0]
 
+        self.temp_list=[]
         # computes
         for j in range(nt):
 
             # updates the time_passed
             self.time_passed = self.time_passed + self.dt
 
-            # defines the material properties accoring to the state list
+            # defines the material properties accoring to the state list    
             for i in range(1, self.num_points - 1):
                 if self.state[i] is True:
                     self.rho[i] = self.materials[self.materials_index[i]].rhoa(
@@ -537,10 +577,20 @@ class single_object(object):
                     self.k[i] = self.materials[self.materials_index[i]].k0(
                         self.temperature[i][0])
 
-            #熱伝達率と温度でインプットする場合
+            #熱伝達率と温度でインプットする場合（固定値）
             if self.input_heat_transfer:
                 td = self.temperature[self.input_heat_transfer_point][0]
                 self.Q0[self.input_heat_transfer_point] = self.Heat_transfer_coefficient * (self.Heat_transfer_temparature - td)/self.dx
+                # print(td,self.Q0)
+
+            #熱伝達率と温度でインプットする場合(関数)
+            if self.input_heat_transfer_function:
+                # print(self.dt*j)
+                td = self.temperature[self.input_heat_transfer_point][0]
+                Heat_transfer_coefficient = self.Heat_transfer_coefficient_function(self.dt*j).tolist()
+                Heat_transfer_temparature = self.Heat_transfer_temparature_function(self.dt*j).tolist()
+                self.temp_list.append([self.dt*j,Heat_transfer_coefficient,Heat_transfer_temparature])
+                self.Q0[self.input_heat_transfer_point] = Heat_transfer_coefficient * (Heat_transfer_temparature - td)/self.dx
                 # print(td,self.Q0)
 
             # SOLVERS

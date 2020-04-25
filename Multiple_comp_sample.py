@@ -24,13 +24,13 @@ import os
 
 # コンポーネント1の特性
 
-material_1 = "water"
-length_1 = 10
+material_1 = "Gd"
+length_1 = 50
 
 # コンポーネント2の特性
 
 material_2 = "Cu"
-length_2 = 20
+length_2 = 50
 
 # 共通事項
 
@@ -38,8 +38,8 @@ length_2 = 20
 init_temperature = 293 #初期温度
 output_file_name_header = "2comp_test"
 
-analysis_time = 60
-dt = 0.01
+analysis_time = 100000
+dt = 0.1
 # -
 
 # 解析モデルの作成
@@ -51,13 +51,13 @@ if os.path.exists(output_file_name_header+"_1.txt"):
     os.remove(output_file_name_header+"_1.txt")
 
 two_comp = ht.system_objects(number_objects=2, materials=(material_1, material_2),
-                 objects_length=(length_1, length_2), amb_temperature=init_temperature, dx=0.001, dt=0.01,
+                 objects_length=(length_1, length_2), amb_temperature=init_temperature, dx=0.01, dt=dt,
                  file_name=output_file_name_header,boundaries=((0,0), (1, 0)), initial_state=False, materials_path=False)
 # -
 
 # 境界条件の設定（断熱以外のオブジェクトを設定する）
 
-two_comp.objects[0].boundaries=(0,0)
+two_comp.objects[0].boundaries=(300,0)
 
 for i in range(len(two_comp.objects)):
     print("コンポーネント" + str(i) + " （前端温度、後端温度)=" + str(two_comp.objects[i].boundaries) + "  ※0は断熱条件")

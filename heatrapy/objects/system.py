@@ -86,6 +86,7 @@ class system_objects:
         self.q2 = 0.
         self.input_heat_transfer = False
         self.input_heat_transfer_function = False #これをTrueにすると熱伝達率+温度での入熱を入れる
+        self.radiation_opp = False #これをTrueにすると輻射を入れる
 
         for i in boundaries:
             if i[1] != 0:
@@ -155,6 +156,22 @@ class system_objects:
         self.Heat_transfer_coefficient_function = Heat_transfer_coefficient_function
         self.Heat_transfer_temparature_function = Heat_transfer_temparature_function
 
+    def set_radiation(self,radiation_point,emissivity,T_gaibu,View_Factor=1):
+        """輻射を追加します。指定した場所から輻射で放熱します。受け側は温度のみを指定（輻射率は同じとします）
+
+        Args:
+            radiation_point {tuple} -- (オブジェクト番号,番号)　入熱するポイントです。一番上の場合は、1です
+            emissivity (float): 輻射率
+            T_gaibu (float): 放射先の温度[K]
+            View_Factor (float, optional): 形状係数. Defaults to 1.
+        """
+        self.radiation_opp = True
+        self.Stefan_Boltzmann_constant = 5.669*10**-8
+        self.radiation_point = radiation_point
+        self.emissivity = emissivity
+        self.T_gaibu = T_gaibu
+        self.View_Factor = View_Factor
+
     def compute(self, timeInterval, write_interval, solver='implicit_k(x)'):
         """Computes the thermal process
 
@@ -207,6 +224,14 @@ class system_objects:
                     self.temp_list.append([self.dt*j,Heat_transfer_coefficient,Heat_transfer_temparature])
                     self.objects[object_number].Q0[self.input_heat_transfer_point[1]] = Heat_transfer_coefficient * (Heat_transfer_temparature - td)/self.dx
                     # print(td,self.Q0)
+
+            #輻射を入れる場合
+                if self.radiation_opp:
+                    td = self.objects[object_number].temperature[self.input_heat_transfer_point[1]][0]
+                    Q_rad = -1*(self.emissivity * self.View_Factor * self.Stefan_Boltzmann_constant * (td**4 - self.T_gaibu**4))/self.dx
+                    self.objects[object_number].Q0[self.radiation_point[1]] = self.objects[object_number].Q0[self.radiation_point[1]] + Q_rad
+                    # print(td,Q_rad,self.Q0)
+
 
                 cond1 = object_number not in [l[0] for l in self.boundaries]
                 if cond1 or (object_number, 0) in self.boundaries:
@@ -370,7 +395,8 @@ class single_object(object):
         self.h_left = h_left
         self.h_right = h_right
         self.input_heat_transfer = False #これをTrueにすると熱伝達率+温度での入熱を入れる
-        self.input_heat_transfer_function = False #これをTrueにすると熱伝達率+温度での入熱を入れる
+        self.input_heat_transfer_function = False #これをTrueにすると熱伝達率+温度での入熱を関数で入れる
+        self.radiation_opp = False #これをTrueにすると輻射を入れる
 
         # loads the data for each material
         if materials_path == False:
@@ -516,6 +542,22 @@ class single_object(object):
         self.Heat_transfer_coefficient_function = Heat_transfer_coefficient_function
         self.Heat_transfer_temparature_function = Heat_transfer_temparature_function
 
+    def set_radiation(self,radiation_point,emissivity,T_gaibu,View_Factor=1):
+        """輻射を追加します。指定した場所から輻射で放熱します。受け側は温度のみを指定（輻射率は同じとします）
+
+        Args:
+            radiation_point (int): 放熱するポイントです
+            emissivity (float): 輻射率
+            T_gaibu (float): 放射先の温度[K]
+            View_Factor (float, optional): 形状係数. Defaults to 1.
+        """
+        self.radiation_opp = True
+        self.Stefan_Boltzmann_constant = 5.669*10**-8
+        self.radiation_point = radiation_point
+        self.emissivity = emissivity
+        self.T_gaibu = T_gaibu
+        self.View_Factor = View_Factor
+
     def changeHeatPower(self, Q=[], Q0=[]):
         """Heat power source change
 
@@ -581,7 +623,7 @@ class single_object(object):
             if self.input_heat_transfer:
                 td = self.temperature[self.input_heat_transfer_point][0]
                 self.Q0[self.input_heat_transfer_point] = self.Heat_transfer_coefficient * (self.Heat_transfer_temparature - td)/self.dx
-                # print(td,self.Q0)
+                print(td,self.Q0)
 
             #熱伝達率と温度でインプットする場合(関数)
             if self.input_heat_transfer_function:
@@ -591,7 +633,14 @@ class single_object(object):
                 Heat_transfer_temparature = self.Heat_transfer_temparature_function(self.dt*j).tolist()
                 self.temp_list.append([self.dt*j,Heat_transfer_coefficient,Heat_transfer_temparature])
                 self.Q0[self.input_heat_transfer_point] = Heat_transfer_coefficient * (Heat_transfer_temparature - td)/self.dx
-                # print(td,self.Q0)
+                print(td,self.Q0)
+
+            #輻射を入れる場合
+            if self.radiation_opp:
+                td = self.temperature[self.input_heat_transfer_point][0]
+                Q_rad = -1*(self.emissivity * self.View_Factor * self.Stefan_Boltzmann_constant * (td**4 - self.T_gaibu**4))/self.dx
+                self.Q0[self.radiation_point] = self.Q0[self.radiation_point] + Q_rad
+                print(td,Q_rad,self.Q0)
 
             # SOLVERS
 
